@@ -160,22 +160,7 @@ export class GameEngine {
   private updateBullets() {
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
-      
-      // Homing logic: Bullets track player position
-      if (b.homing && b.owner === 'enemy') {
-        const dx = this.player.x - b.x;
-        const dy = this.player.y - b.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 1) {
-          const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-          const targetVx = (dx / dist) * speed;
-          const targetVy = (dy / dist) * speed;
-          // Smooth rotation/interpolation of velocity
-          b.vx += (targetVx - b.vx) * 0.04;
-          b.vy += (targetVy - b.vy) * 0.04;
-        }
-      }
-
+      // Note: Continuous homing logic removed to allow dodging
       b.x += b.vx;
       b.y += b.vy;
       if (b.y < -100 || b.y > CANVAS_VIRTUAL_HEIGHT + 100 || b.x < -100 || b.x > CANVAS_VIRTUAL_WIDTH + 100) {
@@ -210,9 +195,23 @@ export class GameEngine {
   }
 
   private spawnBullet(x: number, y: number, vx: number, vy: number, owner: 'player' | 'enemy', damage: number, homing: boolean = false) {
+    let finalVx = vx;
+    let finalVy = vy;
+
+    // If 'homing' is true here, it means 'Aimed at Player'. 
+    // We calculate the direction once so the player can dodge.
+    if (homing && owner === 'enemy') {
+      const dx = this.player.x - x;
+      const dy = this.player.y - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const speed = Math.sqrt(vx * vx + vy * vy) || 7; // Default speed if none provided
+      finalVx = (dx / dist) * speed;
+      finalVy = (dy / dist) * speed;
+    }
+
     this.bullets.push({
       id: Math.random().toString(36).substr(2, 5),
-      x, y, vx, vy,
+      x, y, vx: finalVx, vy: finalVy,
       width: owner === 'player' ? 6 : (homing ? 16 : 12),
       height: owner === 'player' ? 22 : (homing ? 16 : 12),
       active: true,
@@ -220,7 +219,7 @@ export class GameEngine {
       damage,
       health: 1,
       maxHealth: 1,
-      homing
+      homing // Still use this flag for visual rendering (Red color)
     });
   }
 
@@ -315,9 +314,9 @@ export class GameEngine {
             e.lastShot = now;
             if (e.phase === 1) {
               for (let j = -3; j <= 3; j++) {
-                // Occasional homing shot in Phase 1
-                const isHoming = Math.abs(j) === 0;
-                this.spawnBullet(e.x, e.y + 80, j * 2.5, 5, 'enemy', 1, isHoming);
+                // Occasional aimed shot in Phase 1
+                const isAimed = Math.abs(j) === 0;
+                this.spawnBullet(e.x, e.y + 80, j * 2.5, 6, 'enemy', 1, isAimed);
               }
               e.fireRate = 1000 * (1/diff.fire);
             } else if (e.phase === 2) {
@@ -332,8 +331,8 @@ export class GameEngine {
                e.fireRate = 200 * (1/diff.fire);
             } else {
                for (let j = 0; j < 8; j++) {
-                 const isHoming = j === 0;
-                 this.spawnBullet(e.x, e.y, (Math.random() - 0.5) * 22, 5 + Math.random() * 10, 'enemy', 1, isHoming);
+                 const isAimed = j === 0;
+                 this.spawnBullet(e.x, e.y, (Math.random() - 0.5) * 22, 5 + Math.random() * 10, 'enemy', 1, isAimed);
                }
                e.fireRate = 350 * (1/diff.fire);
             }
@@ -343,9 +342,9 @@ export class GameEngine {
         e.x += e.vx;
         e.y += e.vy;
         if (now - e.lastShot > e.fireRate) {
-           // Guardian type fires a homing shot occasionally
-           const isHoming = e.type === 'guardian';
-           this.spawnBullet(e.x, e.y + 20, 0, 6, 'enemy', 1, isHoming);
+           // Guardian type fires an aimed shot at player's position
+           const isAimed = e.type === 'guardian';
+           this.spawnBullet(e.x, e.y + 20, 0, 7.5, 'enemy', 1, isAimed);
            e.lastShot = now;
         }
       }
@@ -511,9 +510,9 @@ export class GameEngine {
         ctx.fillStyle = COLORS.WHITE;
         ctx.fillRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
       } else {
-        if (b.homing) {
+        if (b.homing) { // Visual 'Homing' flag used for Red/Aimed bullets
           const pulse = Math.sin(performance.now() * 0.01) * 2;
-          ctx.fillStyle = '#FF3131'; // Homing bullets are red
+          ctx.fillStyle = '#FF3131'; 
           ctx.shadowBlur = 10;
           ctx.shadowColor = '#FF3131';
           ctx.beginPath();
