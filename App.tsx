@@ -25,7 +25,7 @@ const SigilBackground: React.FC = () => {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  const grid = Array.from({ length: 100 }); // Adjust based on screen density
+  const grid = Array.from({ length: 100 });
 
   return (
     <div ref={containerRef} className="absolute inset-0 overflow-hidden bg-[#050505] opacity-40">
@@ -85,8 +85,9 @@ const App: React.FC = () => {
   
   const [settings, setSettings] = useState<Settings>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return saved ? JSON.parse(saved) : {
-      controlMode: ControlMode.JOYSTICK,
+    // Force ControlMode.DRAG for auto-fire and touch-follow behavior
+    return saved ? { ...JSON.parse(saved), controlMode: ControlMode.DRAG } : {
+      controlMode: ControlMode.DRAG,
       sound: true,
       sfx: true,
       screenShake: true,
@@ -210,6 +211,14 @@ const App: React.FC = () => {
       <div className="relative h-screen w-full bg-black overflow-hidden flex flex-col items-center justify-between p-8">
         <SigilBackground />
 
+        {/* Top Right Settings Button */}
+        <button 
+          onClick={() => setView('settings')} 
+          className="absolute top-8 right-8 z-20 w-12 h-12 flex items-center justify-center border border-[#39FF14]/30 rounded-full bg-black/20 hover:bg-[#39FF14]/10 transition-colors"
+        >
+          <span className="text-[#39FF14] text-xl">⚙</span>
+        </button>
+
         {/* Header/Score Space */}
         <div className="z-10 mt-12">
           <p className="text-neutral-600 text-[10px] tracking-widest uppercase font-bold text-center">Best Ritual: {displayBestScore}</p>
@@ -219,9 +228,8 @@ const App: React.FC = () => {
         <div className="z-10 text-center">
           <h1 className="text-6xl md:text-8xl font-occult font-black text-white mb-2 drop-shadow-[0_0_25px_rgba(57,255,20,0.6)] tracking-tighter">VOID RITE</h1>
           <p className="text-[#39FF14] tracking-[0.4em] uppercase text-xs mb-16 font-black">Sacrifice the Core</p>
-          <div className="space-y-4 max-w-xs mx-auto">
+          <div className="max-w-xs mx-auto">
             <button onClick={() => setView('play')} className="w-full py-6 bg-[#39FF14] text-black font-black text-2xl hover:scale-105 active:scale-95 transition-all font-occult shadow-[0_0_20px_rgba(57,255,20,0.4)]">BEGIN RITE</button>
-            <button onClick={() => setView('settings')} className="w-full py-4 border border-white text-white font-bold tracking-widest hover:bg-white hover:text-black transition-all">SETTINGS</button>
           </div>
         </div>
 
@@ -274,14 +282,6 @@ const App: React.FC = () => {
                 {settings.difficulty === Difficulty.MID && "A balanced path through the drifting void. 1.3x Intensity."}
                 {settings.difficulty === Difficulty.HARD && "The Archons demand perfection. Maximum ritual intensity."}
               </p>
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-[#39FF14] text-xs font-black tracking-[0.3em] mb-6 border-l-2 border-[#39FF14] pl-3">CONTROL INTERFACE</h3>
-            <div className="flex gap-3">
-              <button onClick={() => setSettings(s => ({...s, controlMode: ControlMode.JOYSTICK}))} className={`flex-1 py-4 text-xs font-bold border-2 transition-all ${settings.controlMode === ControlMode.JOYSTICK ? 'border-[#39FF14] text-[#39FF14]' : 'border-neutral-900 text-neutral-600'}`}>JOYSTICK</button>
-              <button onClick={() => setSettings(s => ({...s, controlMode: ControlMode.DRAG}))} className={`flex-1 py-4 text-xs font-bold border-2 transition-all ${settings.controlMode === ControlMode.DRAG ? 'border-[#39FF14] text-[#39FF14]' : 'border-neutral-900 text-neutral-600'}`}>DRAG</button>
             </div>
           </section>
 

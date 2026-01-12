@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { GameState, Settings, ControlMode } from '../types';
+import { GameState, Settings } from '../types';
 
 interface GameUIProps {
   gameState: GameState;
@@ -17,11 +17,9 @@ const SIGIL_IMG = 'https://i.ibb.co.com/XkCCS678/Picsart-26-01-12-16-48-17-683.p
 const GameUI: React.FC<GameUIProps> = ({ 
   gameState, 
   hud, 
-  settings, 
   onAction, 
   onJoystickMove, 
-  onJoystickEnd,
-  onShootToggle 
+  onJoystickEnd
 }) => {
   const handleJoystickTouch = (e: React.TouchEvent) => {
     const touch = e.touches[0];
@@ -31,7 +29,7 @@ const GameUI: React.FC<GameUIProps> = ({
     const dx = touch.clientX - centerX;
     const dy = touch.clientY - centerY;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = rect.width / 2;
+    const maxDist = rect.width / 4; 
     
     const nx = dx / maxDist;
     const ny = dy / maxDist;
@@ -69,44 +67,33 @@ const GameUI: React.FC<GameUIProps> = ({
         </div>
       </div>
 
-      {/* Pause Button */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 pointer-events-auto">
+      {/* Pause Button - Ensure it has a higher z-index than the touch layer */}
+      <div className="absolute top-6 left-6 pointer-events-auto z-10">
         <button 
-          onClick={() => onAction('pause')}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAction('pause');
+          }}
           className="w-12 h-12 bg-black/40 border border-[#39FF14]/50 text-[#39FF14] flex items-center justify-center rounded-full backdrop-blur-md active:scale-90 transition-transform"
         >
           <span className="text-xs font-bold">II</span>
         </button>
       </div>
 
-      {/* Controls */}
+      {/* Touch Input Layer - Invisible Full Screen Control */}
       {gameState === GameState.PLAYING && (
-        <div className="flex justify-between items-end pb-safe pointer-events-none">
-          {/* Virtual Joystick */}
-          <div 
-            className="w-36 h-36 rounded-full border-2 border-[#39FF14]/20 pointer-events-auto relative bg-black/20 backdrop-blur-[2px] flex items-center justify-center"
-            onTouchMove={handleJoystickTouch}
-            onTouchEnd={onJoystickEnd}
-          >
-            <div className="w-14 h-14 rounded-full border-2 border-[#39FF14] shadow-[0_0_15px_#39FF14]" />
-          </div>
-
-          {/* Shoot Button */}
-          {settings.controlMode === ControlMode.JOYSTICK && (
-            <div 
-              className="w-28 h-28 rounded-full border-4 border-[#39FF14] pointer-events-auto flex items-center justify-center bg-black/40 backdrop-blur-sm active:bg-[#39FF14]/30 active:scale-95 transition-all shadow-lg"
-              onTouchStart={() => onShootToggle(true)}
-              onTouchEnd={() => onShootToggle(false)}
-            >
-              <div className="text-[#39FF14] text-5xl font-occult drop-shadow-[0_0_10px_#39FF14]">❂</div>
-            </div>
-          )}
-        </div>
+        <div 
+          className="absolute inset-0 pointer-events-auto z-0"
+          onTouchMove={handleJoystickTouch}
+          onTouchStart={handleJoystickTouch}
+          onTouchEnd={onJoystickEnd}
+          onTouchCancel={onJoystickEnd}
+        />
       )}
 
       {/* Modals */}
       {(gameState === GameState.PAUSED || gameState === GameState.GAMEOVER) && (
-        <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-6 pointer-events-auto backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-6 pointer-events-auto backdrop-blur-sm z-50">
           <div className="max-w-xs w-full border-2 border-[#39FF14] p-10 bg-black shadow-[0_0_50px_rgba(57,255,20,0.2)] flex flex-col items-center text-center">
             {gameState === GameState.PAUSED ? (
               <>
