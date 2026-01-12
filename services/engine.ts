@@ -66,7 +66,6 @@ export class GameEngine {
   private bossCooldown = 12000; 
   private bossSpawnThreshold = 5000;
 
-  // Modified joystick to support target coordinates
   public joystick = { active: false, x: 0, y: 0, targetX: 0, targetY: 0 };
   public keyboard = { up: false, down: false, left: false, right: false, space: false };
   public shooting = false;
@@ -121,15 +120,11 @@ export class GameEngine {
 
   private updatePlayer() {
     if (this.settings.controlMode === ControlMode.DRAG && this.joystick.active) {
-      // Smoothly move towards target finger position
       const dx = this.joystick.targetX - this.player.x;
       const dy = this.joystick.targetY - this.player.y;
-      
-      // Direct follow logic with damping for smoothness
       this.player.vx = dx * 0.4;
       this.player.vy = dy * 0.4;
     } else {
-      // Normal joystick/keyboard logic
       let inputX = this.joystick.active ? this.joystick.x : 0;
       let inputY = this.joystick.active ? this.joystick.y : 0;
       if (this.keyboard.left) inputX -= 1;
@@ -154,7 +149,6 @@ export class GameEngine {
     this.player.y = Math.max(50, Math.min(CANVAS_VIRTUAL_HEIGHT - 50, this.player.y));
     
     const now = performance.now();
-    // Auto-fire in DRAG mode
     const canShoot = this.settings.controlMode === ControlMode.DRAG ? true : (this.shooting || this.keyboard.space);
     if (canShoot && now - this.player.lastShot > this.player.fireRate) {
       this.firePlayerWeapon();
@@ -214,8 +208,12 @@ export class GameEngine {
 
   private getDifficultyModifier() {
     switch(this.settings.difficulty) {
-      case Difficulty.EASY: return { hp: 0.5, fire: 0.5, drop: 2.0, accel: 1.0 };
-      case Difficulty.HARD: return { hp: 1.6, fire: 1.4, drop: 0.8, accel: 1.6 }; 
+      // Easy is now what Mid used to be
+      case Difficulty.EASY: return { hp: 1.0, fire: 1.0, drop: 1.2, accel: 1.3 };
+      // Mid is now 1.8x intensity (old Mid was 1.3)
+      case Difficulty.MID: return { hp: 1.5, fire: 1.4, drop: 1.0, accel: 1.8 }; 
+      // Hard is even more extreme
+      case Difficulty.HARD: return { hp: 2.2, fire: 1.8, drop: 0.7, accel: 2.5 };
       default: return { hp: 1.0, fire: 1.0, drop: 1.0, accel: 1.3 };
     }
   }
@@ -230,21 +228,21 @@ export class GameEngine {
     }
     this.spawnTimer += this.dt;
     const progressionFactor = Math.floor((this.score * diff.accel) / 3500);
-    const scaledRate = Math.max(400, (2000 - (progressionFactor * 130)) / diff.fire);
+    const scaledRate = Math.max(350, (1800 - (progressionFactor * 150)) / diff.fire);
     if (this.spawnTimer > scaledRate) {
       this.spawnTimer = 0;
       const roll = Math.random();
       let type: 'drone' | 'skimmer' | 'guardian' = 'drone';
       const scoreCheck = this.score * diff.accel;
-      if (scoreCheck > 18000 && roll > 0.85) type = 'guardian';
-      else if (scoreCheck > 7000 && roll > 0.75) type = 'skimmer';
-      const hpScale = (1 + (scoreCheck / 40000)) * diff.hp;
+      if (scoreCheck > 15000 && roll > 0.8) type = 'guardian';
+      else if (scoreCheck > 5000 && roll > 0.7) type = 'skimmer';
+      const hpScale = (1 + (scoreCheck / 35000)) * diff.hp;
       this.enemies.push({
         id: Math.random().toString(36).substr(2, 5),
         x: Math.random() * (CANVAS_VIRTUAL_WIDTH - 100) + 50,
         y: -80,
         vx: (Math.random() - 0.5) * 1.5,
-        vy: 1.0 + Math.random() * 1.2,
+        vy: 1.0 + Math.random() * 1.5,
         width: type === 'guardian' ? 60 : 45,
         height: type === 'guardian' ? 60 : 45,
         active: true,
@@ -253,7 +251,7 @@ export class GameEngine {
         maxHealth: (type === 'guardian' ? 60 : type === 'skimmer' ? 20 : 10) * hpScale,
         scoreValue: type === 'guardian' ? 400 : 100,
         lastShot: performance.now() + Math.random() * 1000,
-        fireRate: Math.max(800, 3200 - (progressionFactor * 200)) * (1/diff.fire)
+        fireRate: Math.max(600, 2800 - (progressionFactor * 250)) * (1/diff.fire)
       });
     }
   }
@@ -261,7 +259,7 @@ export class GameEngine {
   private spawnBoss() {
     this.bossActive = true;
     const diff = this.getDifficultyModifier();
-    const hp = (6000 + (this.score / 2)) * diff.hp;
+    const hp = (6500 + (this.score / 1.5)) * diff.hp;
     this.enemies.push({
       id: 'boss-archon',
       x: CANVAS_VIRTUAL_WIDTH / 2,
@@ -276,7 +274,7 @@ export class GameEngine {
       maxHealth: hp,
       scoreValue: 10000,
       lastShot: performance.now(),
-      fireRate: 1100 * (1/diff.fire),
+      fireRate: 1000 * (1/diff.fire),
       phase: 1
     });
   }
@@ -302,14 +300,14 @@ export class GameEngine {
                 const ang = (j / 14) * Math.PI * 2 + (now * 0.0006);
                 this.spawnBullet(e.x, e.y, Math.cos(ang) * 5, Math.sin(ang) * 5, 'enemy', 1);
               }
-              e.fireRate = 1300;
+              e.fireRate = 1200;
             } else if (e.phase === 3) {
                const sweep = Math.sin(now * 0.004) * 8;
                this.spawnBullet(e.x, e.y + 80, sweep, 9, 'enemy', 1);
-               e.fireRate = 300;
+               e.fireRate = 250;
             } else {
                for (let j = 0; j < 6; j++) this.spawnBullet(e.x, e.y, (Math.random() - 0.5) * 18, 4 + Math.random() * 9, 'enemy', 1);
-               e.fireRate = 400;
+               e.fireRate = 350;
             }
           }
         }
@@ -337,7 +335,7 @@ export class GameEngine {
             b.active = false;
             e.health -= b.damage;
             this.spawnExplosion(b.x, b.y, 1, COLORS.WHITE);
-            const hitDropThreshold = 0.992 / diff.drop; 
+            const hitDropThreshold = 0.993 / diff.drop; 
             if (e.type === 'boss' && Math.random() > hitDropThreshold) {
               this.spawnPowerUp(e.x + (Math.random()-0.5)*150, e.y + 80);
             }
@@ -351,7 +349,7 @@ export class GameEngine {
                 this.applyPowerUp('repair');
                 for (let k = 0; k < 2; k++) this.spawnPowerUp(e.x + (k-0.5)*80, e.y);
               }
-              const baseDrop = 0.06 * diff.drop;
+              const baseDrop = 0.07 * diff.drop;
               if (Math.random() < baseDrop) this.spawnPowerUp(e.x, e.y);
             }
             break;

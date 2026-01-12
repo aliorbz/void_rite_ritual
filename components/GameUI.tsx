@@ -39,12 +39,31 @@ const GameUI: React.FC<GameUIProps> = ({
 
   return (
     <div className="fixed inset-0 pointer-events-none select-none flex flex-col justify-between p-6">
-      {/* Top HUD */}
+      {/* Combined Score and Pause Button HUD */}
       <div className="flex justify-between items-start pt-safe">
-        <div>
-          <div className="text-white text-3xl font-bold font-occult drop-shadow-md">SCORE: {hud.score}</div>
-          <div className="text-neutral-500 text-xs tracking-[0.2em] mt-1 font-bold">BEST: {hud.bestScore}</div>
+        <div className="flex items-center gap-4 pointer-events-auto">
+          {/* Pause Button */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onAction('pause');
+            }}
+            className="w-12 h-12 bg-black/40 border border-[#39FF14]/50 text-[#39FF14] flex items-center justify-center rounded-full backdrop-blur-md active:scale-90 transition-transform"
+          >
+            <span className="text-xs font-bold">II</span>
+          </button>
+          
+          {/* Numerical Score Only */}
+          <div className="flex flex-col">
+            <div className="text-white text-3xl font-bold font-occult drop-shadow-md leading-none">
+              {hud.score}
+            </div>
+            <div className="text-neutral-500 text-[10px] tracking-[0.2em] mt-1 font-bold">
+              BEST: {hud.bestScore}
+            </div>
+          </div>
         </div>
+
         <div className="text-right flex flex-col items-end">
           <div className="flex gap-2 justify-end mb-2">
             {[...Array(3)].map((_, i) => (
@@ -62,19 +81,6 @@ const GameUI: React.FC<GameUIProps> = ({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Pause Button */}
-      <div className="absolute top-6 left-6 pointer-events-auto z-10">
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            onAction('pause');
-          }}
-          className="w-12 h-12 bg-black/40 border border-[#39FF14]/50 text-[#39FF14] flex items-center justify-center rounded-full backdrop-blur-md active:scale-90 transition-transform"
-        >
-          <span className="text-xs font-bold">II</span>
-        </button>
       </div>
 
       {/* Touch Input Layer - Full Screen Control */}
