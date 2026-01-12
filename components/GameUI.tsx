@@ -39,18 +39,19 @@ const GameUI: React.FC<GameUIProps> = ({
 
   return (
     <div className="fixed inset-0 pointer-events-none select-none flex flex-col justify-between p-6">
-      {/* Combined Score and Pause Button HUD */}
-      <div className="flex justify-between items-start pt-safe">
+      {/* HUD - Must be on top of the touch layer to receive clicks */}
+      <div className="relative z-20 flex justify-between items-start pt-safe">
         <div className="flex items-center gap-4 pointer-events-auto">
           {/* Pause Button */}
           <button 
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               onAction('pause');
             }}
             className="w-12 h-12 bg-black/40 border border-[#39FF14]/50 text-[#39FF14] flex items-center justify-center rounded-full backdrop-blur-md active:scale-90 transition-transform"
           >
-            <span className="text-xs font-bold">II</span>
+            <span className="text-xl font-bold tracking-tight">II</span>
           </button>
           
           {/* Numerical Score Only */}
@@ -83,10 +84,10 @@ const GameUI: React.FC<GameUIProps> = ({
         </div>
       </div>
 
-      {/* Touch Input Layer - Full Screen Control */}
+      {/* Touch Input Layer - Sits behind HUD (z-10) but covers the rest of the screen */}
       {gameState === GameState.PLAYING && (
         <div 
-          className="absolute inset-0 pointer-events-auto z-0"
+          className="absolute inset-0 pointer-events-auto z-10"
           onTouchMove={handleJoystickTouch}
           onTouchStart={handleJoystickTouch}
           onTouchEnd={onJoystickEnd}
@@ -94,7 +95,7 @@ const GameUI: React.FC<GameUIProps> = ({
         />
       )}
 
-      {/* Modals */}
+      {/* Modals - z-50 to ensure they are on the very top */}
       {(gameState === GameState.PAUSED || gameState === GameState.GAMEOVER) && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-6 pointer-events-auto backdrop-blur-sm z-50">
           <div className="max-w-xs w-full border-2 border-[#39FF14] p-10 bg-black shadow-[0_0_50px_rgba(57,255,20,0.2)] flex flex-col items-center text-center">

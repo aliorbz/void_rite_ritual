@@ -65,6 +65,7 @@ export class GameEngine {
   private lastBossScore = 0;
   private bossCooldown = 12000; 
   private bossSpawnThreshold = 5000;
+  private bossPhaseTimer = 0;
 
   public joystick = { active: false, x: 0, y: 0, targetX: 0, targetY: 0 };
   public keyboard = { up: false, down: false, left: false, right: false, space: false };
@@ -122,8 +123,8 @@ export class GameEngine {
     if (this.settings.controlMode === ControlMode.DRAG && this.joystick.active) {
       const dx = this.joystick.targetX - this.player.x;
       const dy = this.joystick.targetY - this.player.y;
-      this.player.vx = dx * 0.4;
-      this.player.vy = dy * 0.4;
+      this.player.vx = dx * 0.45;
+      this.player.vy = dy * 0.45;
     } else {
       let inputX = this.joystick.active ? this.joystick.x : 0;
       let inputY = this.joystick.active ? this.joystick.y : 0;
@@ -159,6 +160,22 @@ export class GameEngine {
   private updateBullets() {
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
+      
+      // Homing logic: Bullets track player position
+      if (b.homing && b.owner === 'enemy') {
+        const dx = this.player.x - b.x;
+        const dy = this.player.y - b.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 1) {
+          const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+          const targetVx = (dx / dist) * speed;
+          const targetVy = (dy / dist) * speed;
+          // Smooth rotation/interpolation of velocity
+          b.vx += (targetVx - b.vx) * 0.04;
+          b.vy += (targetVy - b.vy) * 0.04;
+        }
+      }
+
       b.x += b.vx;
       b.y += b.vy;
       if (b.y < -100 || b.y > CANVAS_VIRTUAL_HEIGHT + 100 || b.x < -100 || b.x > CANVAS_VIRTUAL_WIDTH + 100) {
@@ -178,43 +195,41 @@ export class GameEngine {
   }
 
   private firePlayerWeapon() {
-    const damage = 10;
-    const speed = -17;
+    const baseDamage = this.player.weaponType > 1 ? 16 : 10;
+    const speed = -18;
     if (this.player.weaponType === 1) {
-      this.spawnBullet(this.player.x, this.player.y - 20, 0, speed, 'player', damage);
+      this.spawnBullet(this.player.x, this.player.y - 20, 0, speed, 'player', baseDamage);
     } else if (this.player.weaponType === 2) {
-      this.spawnBullet(this.player.x - 14, this.player.y - 20, 0, speed, 'player', damage);
-      this.spawnBullet(this.player.x + 14, this.player.y - 20, 0, speed, 'player', damage);
+      this.spawnBullet(this.player.x - 14, this.player.y - 20, 0, speed, 'player', baseDamage);
+      this.spawnBullet(this.player.x + 14, this.player.y - 20, 0, speed, 'player', baseDamage);
     } else {
-      this.spawnBullet(this.player.x, this.player.y - 22, 0, speed, 'player', damage);
-      this.spawnBullet(this.player.x - 22, this.player.y - 15, -2.8, speed, 'player', damage);
-      this.spawnBullet(this.player.x + 22, this.player.y - 15, 2.8, speed, 'player', damage);
+      this.spawnBullet(this.player.x, this.player.y - 22, 0, speed, 'player', baseDamage + 2);
+      this.spawnBullet(this.player.x - 22, this.player.y - 15, -3.2, speed, 'player', baseDamage);
+      this.spawnBullet(this.player.x + 22, this.player.y - 15, 3.2, speed, 'player', baseDamage);
     }
   }
 
-  private spawnBullet(x: number, y: number, vx: number, vy: number, owner: 'player' | 'enemy', damage: number) {
+  private spawnBullet(x: number, y: number, vx: number, vy: number, owner: 'player' | 'enemy', damage: number, homing: boolean = false) {
     this.bullets.push({
       id: Math.random().toString(36).substr(2, 5),
       x, y, vx, vy,
-      width: owner === 'player' ? 5 : 12,
-      height: owner === 'player' ? 20 : 12,
+      width: owner === 'player' ? 6 : (homing ? 16 : 12),
+      height: owner === 'player' ? 22 : (homing ? 16 : 12),
       active: true,
       owner,
       damage,
       health: 1,
-      maxHealth: 1
+      maxHealth: 1,
+      homing
     });
   }
 
   private getDifficultyModifier() {
     switch(this.settings.difficulty) {
-      // Easy is now what Mid used to be
-      case Difficulty.EASY: return { hp: 1.0, fire: 1.0, drop: 1.2, accel: 1.3 };
-      // Mid is now 1.8x intensity (old Mid was 1.3)
-      case Difficulty.MID: return { hp: 1.5, fire: 1.4, drop: 1.0, accel: 1.8 }; 
-      // Hard is even more extreme
-      case Difficulty.HARD: return { hp: 2.2, fire: 1.8, drop: 0.7, accel: 2.5 };
-      default: return { hp: 1.0, fire: 1.0, drop: 1.0, accel: 1.3 };
+      case Difficulty.EASY: return { hp: 1.0, fire: 1.0, drop: 1.1, accel: 1.3, bossInterval: 11000 };
+      case Difficulty.MID: return { hp: 1.5, fire: 1.4, drop: 1.2, accel: 1.8, bossInterval: 8000 }; 
+      case Difficulty.HARD: return { hp: 2.3, fire: 1.9, drop: 1.5, accel: 2.8, bossInterval: 5000 };
+      default: return { hp: 1.0, fire: 1.0, drop: 1.0, accel: 1.3, bossInterval: 8000 };
     }
   }
 
@@ -228,21 +243,21 @@ export class GameEngine {
     }
     this.spawnTimer += this.dt;
     const progressionFactor = Math.floor((this.score * diff.accel) / 3500);
-    const scaledRate = Math.max(350, (1800 - (progressionFactor * 150)) / diff.fire);
+    const scaledRate = Math.max(300, (1800 - (progressionFactor * 160)) / diff.fire);
     if (this.spawnTimer > scaledRate) {
       this.spawnTimer = 0;
       const roll = Math.random();
       let type: 'drone' | 'skimmer' | 'guardian' = 'drone';
       const scoreCheck = this.score * diff.accel;
-      if (scoreCheck > 15000 && roll > 0.8) type = 'guardian';
-      else if (scoreCheck > 5000 && roll > 0.7) type = 'skimmer';
-      const hpScale = (1 + (scoreCheck / 35000)) * diff.hp;
+      if (scoreCheck > 14000 && roll > 0.75) type = 'guardian';
+      else if (scoreCheck > 4500 && roll > 0.65) type = 'skimmer';
+      const hpScale = (1 + (scoreCheck / 32000)) * diff.hp;
       this.enemies.push({
         id: Math.random().toString(36).substr(2, 5),
         x: Math.random() * (CANVAS_VIRTUAL_WIDTH - 100) + 50,
         y: -80,
         vx: (Math.random() - 0.5) * 1.5,
-        vy: 1.0 + Math.random() * 1.5,
+        vy: 1.0 + Math.random() * 1.8,
         width: type === 'guardian' ? 60 : 45,
         height: type === 'guardian' ? 60 : 45,
         active: true,
@@ -251,15 +266,16 @@ export class GameEngine {
         maxHealth: (type === 'guardian' ? 60 : type === 'skimmer' ? 20 : 10) * hpScale,
         scoreValue: type === 'guardian' ? 400 : 100,
         lastShot: performance.now() + Math.random() * 1000,
-        fireRate: Math.max(600, 2800 - (progressionFactor * 250)) * (1/diff.fire)
+        fireRate: Math.max(500, 2600 - (progressionFactor * 260)) * (1/diff.fire)
       });
     }
   }
 
   private spawnBoss() {
     this.bossActive = true;
+    this.bossPhaseTimer = 0;
     const diff = this.getDifficultyModifier();
-    const hp = (6500 + (this.score / 1.5)) * diff.hp;
+    const hp = (7500 + (this.score / 1.2)) * diff.hp;
     this.enemies.push({
       id: 'boss-archon',
       x: CANVAS_VIRTUAL_WIDTH / 2,
@@ -274,40 +290,52 @@ export class GameEngine {
       maxHealth: hp,
       scoreValue: 10000,
       lastShot: performance.now(),
-      fireRate: 1000 * (1/diff.fire),
+      fireRate: 950 * (1/diff.fire),
       phase: 1
     });
   }
 
   private updateEnemies() {
     const now = performance.now();
+    const diff = this.getDifficultyModifier();
+    
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const e = this.enemies[i];
       if (e.type === 'boss') {
         if (e.y < 180) {
           e.y += e.vy;
         } else {
-          const hpPercent = e.health / e.maxHealth;
-          if (hpPercent < 0.2) e.phase = 4;
-          else if (hpPercent < 0.5) e.phase = 3;
-          else if (hpPercent < 0.8) e.phase = 2;
+          this.bossPhaseTimer += this.dt;
+          if (this.bossPhaseTimer >= diff.bossInterval) {
+            this.bossPhaseTimer = 0;
+            e.phase = (e.phase! % 4) + 1;
+          }
+
           if (now - e.lastShot > e.fireRate) {
             e.lastShot = now;
             if (e.phase === 1) {
-              for (let j = -2; j <= 2; j++) this.spawnBullet(e.x, e.y + 80, j * 2, 5, 'enemy', 1);
-            } else if (e.phase === 2) {
-              for (let j = 0; j < 14; j++) {
-                const ang = (j / 14) * Math.PI * 2 + (now * 0.0006);
-                this.spawnBullet(e.x, e.y, Math.cos(ang) * 5, Math.sin(ang) * 5, 'enemy', 1);
+              for (let j = -3; j <= 3; j++) {
+                // Occasional homing shot in Phase 1
+                const isHoming = Math.abs(j) === 0;
+                this.spawnBullet(e.x, e.y + 80, j * 2.5, 5, 'enemy', 1, isHoming);
               }
-              e.fireRate = 1200;
+              e.fireRate = 1000 * (1/diff.fire);
+            } else if (e.phase === 2) {
+              for (let j = 0; j < 16; j++) {
+                const ang = (j / 16) * Math.PI * 2 + (now * 0.0008);
+                this.spawnBullet(e.x, e.y, Math.cos(ang) * 5.5, Math.sin(ang) * 5.5, 'enemy', 1);
+              }
+              e.fireRate = 1200 * (1/diff.fire);
             } else if (e.phase === 3) {
-               const sweep = Math.sin(now * 0.004) * 8;
-               this.spawnBullet(e.x, e.y + 80, sweep, 9, 'enemy', 1);
-               e.fireRate = 250;
+               const sweep = Math.sin(now * 0.005) * 10;
+               this.spawnBullet(e.x, e.y + 80, sweep, 9.5, 'enemy', 1);
+               e.fireRate = 200 * (1/diff.fire);
             } else {
-               for (let j = 0; j < 6; j++) this.spawnBullet(e.x, e.y, (Math.random() - 0.5) * 18, 4 + Math.random() * 9, 'enemy', 1);
-               e.fireRate = 350;
+               for (let j = 0; j < 8; j++) {
+                 const isHoming = j === 0;
+                 this.spawnBullet(e.x, e.y, (Math.random() - 0.5) * 22, 5 + Math.random() * 10, 'enemy', 1, isHoming);
+               }
+               e.fireRate = 350 * (1/diff.fire);
             }
           }
         }
@@ -315,7 +343,9 @@ export class GameEngine {
         e.x += e.vx;
         e.y += e.vy;
         if (now - e.lastShot > e.fireRate) {
-           this.spawnBullet(e.x, e.y + 20, 0, 6, 'enemy', 1);
+           // Guardian type fires a homing shot occasionally
+           const isHoming = e.type === 'guardian';
+           this.spawnBullet(e.x, e.y + 20, 0, 6, 'enemy', 1, isHoming);
            e.lastShot = now;
         }
       }
@@ -335,22 +365,27 @@ export class GameEngine {
             b.active = false;
             e.health -= b.damage;
             this.spawnExplosion(b.x, b.y, 1, COLORS.WHITE);
-            const hitDropThreshold = 0.993 / diff.drop; 
-            if (e.type === 'boss' && Math.random() > hitDropThreshold) {
+            
+            const bossHitDropChance = 0.006; 
+            if (e.type === 'boss' && Math.random() < bossHitDropChance) {
               this.spawnPowerUp(e.x + (Math.random()-0.5)*150, e.y + 80);
             }
+
             if (e.health <= 0) {
               e.active = false;
               this.score += e.scoreValue;
               this.spawnExplosion(e.x, e.y, e.type === 'boss' ? 120 : 12, COLORS.NEON_GREEN);
+              
               if (e.type === 'boss') {
                 this.bossActive = false;
                 this.lastBossScore = this.score;
                 this.applyPowerUp('repair');
-                for (let k = 0; k < 2; k++) this.spawnPowerUp(e.x + (k-0.5)*80, e.y);
+                const count = Math.random() > 0.5 ? 3 : 2;
+                for (let k = 0; k < count; k++) this.spawnPowerUp(e.x + (k - (count-1)/2)*80, e.y);
               }
-              const baseDrop = 0.07 * diff.drop;
-              if (Math.random() < baseDrop) this.spawnPowerUp(e.x, e.y);
+
+              const baseDropRate = 0.09 * diff.drop;
+              if (Math.random() < baseDropRate) this.spawnPowerUp(e.x, e.y);
             }
             break;
           }
@@ -395,7 +430,7 @@ export class GameEngine {
     if (type === 'double') this.player.weaponType = 2;
     if (type === 'triple') this.player.weaponType = 3;
     if (type === 'shield') this.player.shield = 100;
-    if (type === 'rate') this.player.fireRate = Math.max(60, this.player.fireRate - 20);
+    if (type === 'rate') this.player.fireRate = Math.max(50, this.player.fireRate - 30);
     if (type === 'repair') this.player.health = Math.min(this.player.maxHealth, this.player.health + 1);
   }
 
@@ -429,7 +464,7 @@ export class GameEngine {
     const type = types[Math.floor(Math.random() * types.length)];
     this.powerUps.push({
       id: Math.random().toString(),
-      x, y, vx: 0, vy: 1.5,
+      x, y, vx: 0, vy: 1.8,
       width: 36, height: 36,
       active: true,
       health: 1, maxHealth: 1,
@@ -472,12 +507,25 @@ export class GameEngine {
     for (const p of this.powerUps) this.drawPowerUp(ctx, p);
     for (const e of this.enemies) this.drawEnemy(ctx, e);
     for (const b of this.bullets) {
-      ctx.fillStyle = b.owner === 'player' ? COLORS.WHITE : COLORS.NEON_GREEN;
-      if (b.owner === 'player') ctx.fillRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
-      else {
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.width/2, 0, Math.PI * 2);
-        ctx.fill();
+      if (b.owner === 'player') {
+        ctx.fillStyle = COLORS.WHITE;
+        ctx.fillRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
+      } else {
+        if (b.homing) {
+          const pulse = Math.sin(performance.now() * 0.01) * 2;
+          ctx.fillStyle = '#FF3131'; // Homing bullets are red
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#FF3131';
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, (b.width/2) + pulse, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        } else {
+          ctx.fillStyle = COLORS.NEON_GREEN;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.width/2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
     if (this.player.invuln <= 0 || Math.floor(performance.now() / 120) % 2 === 0) this.drawPlayer(ctx);
@@ -635,6 +683,7 @@ export class GameEngine {
     this.bossActive = false;
     this.lastBossScore = 0;
     this.bossSpawnThreshold = 5000;
+    this.bossPhaseTimer = 0;
     this.gameState = GameState.PLAYING;
     this.lastTime = performance.now();
   }

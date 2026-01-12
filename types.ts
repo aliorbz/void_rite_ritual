@@ -48,6 +48,7 @@ export interface Entity {
 export interface Bullet extends Entity {
   owner: 'player' | 'enemy';
   damage: number;
+  homing?: boolean;
 }
 
 export interface Enemy extends Entity {
