@@ -64,9 +64,10 @@ export class GameEngine {
   private bossActive = false;
   private lastBossScore = 0;
   private bossCooldown = 12000; 
-  private bossSpawnThreshold = 5000; // Lowered slightly to start action sooner
+  private bossSpawnThreshold = 5000;
 
-  public joystick = { active: false, x: 0, y: 0 };
+  // Modified joystick to support target coordinates
+  public joystick = { active: false, x: 0, y: 0, targetX: 0, targetY: 0 };
   public keyboard = { up: false, down: false, left: false, right: false, space: false };
   public shooting = false;
 
@@ -119,26 +120,41 @@ export class GameEngine {
   }
 
   private updatePlayer() {
-    let inputX = this.joystick.active ? this.joystick.x : 0;
-    let inputY = this.joystick.active ? this.joystick.y : 0;
-    if (this.keyboard.left) inputX -= 1;
-    if (this.keyboard.right) inputX += 1;
-    if (this.keyboard.up) inputY -= 1;
-    if (this.keyboard.down) inputY += 1;
-    if (inputX !== 0 && inputY !== 0 && !this.joystick.active) {
-      const mag = Math.sqrt(inputX * inputX + inputY * inputY);
-      inputX /= mag;
-      inputY /= mag;
+    if (this.settings.controlMode === ControlMode.DRAG && this.joystick.active) {
+      // Smoothly move towards target finger position
+      const dx = this.joystick.targetX - this.player.x;
+      const dy = this.joystick.targetY - this.player.y;
+      
+      // Direct follow logic with damping for smoothness
+      this.player.vx = dx * 0.4;
+      this.player.vy = dy * 0.4;
+    } else {
+      // Normal joystick/keyboard logic
+      let inputX = this.joystick.active ? this.joystick.x : 0;
+      let inputY = this.joystick.active ? this.joystick.y : 0;
+      if (this.keyboard.left) inputX -= 1;
+      if (this.keyboard.right) inputX += 1;
+      if (this.keyboard.up) inputY -= 1;
+      if (this.keyboard.down) inputY += 1;
+      
+      if (inputX !== 0 && inputY !== 0 && !this.joystick.active) {
+        const mag = Math.sqrt(inputX * inputX + inputY * inputY);
+        inputX /= mag;
+        inputY /= mag;
+      }
+      this.player.vx += inputX * PLAYER_SPEED * 2.1;
+      this.player.vy += inputY * PLAYER_SPEED * 2.1;
+      this.player.vx *= PLAYER_DAMPING;
+      this.player.vy *= PLAYER_DAMPING;
     }
-    this.player.vx += inputX * PLAYER_SPEED * 2.1;
-    this.player.vy += inputY * PLAYER_SPEED * 2.1;
-    this.player.vx *= PLAYER_DAMPING;
-    this.player.vy *= PLAYER_DAMPING;
+
     this.player.x += this.player.vx;
     this.player.y += this.player.vy;
     this.player.x = Math.max(20, Math.min(CANVAS_VIRTUAL_WIDTH - 20, this.player.x));
     this.player.y = Math.max(50, Math.min(CANVAS_VIRTUAL_HEIGHT - 50, this.player.y));
+    
     const now = performance.now();
+    // Auto-fire in DRAG mode
     const canShoot = this.settings.controlMode === ControlMode.DRAG ? true : (this.shooting || this.keyboard.space);
     if (canShoot && now - this.player.lastShot > this.player.fireRate) {
       this.firePlayerWeapon();
@@ -200,40 +216,29 @@ export class GameEngine {
     switch(this.settings.difficulty) {
       case Difficulty.EASY: return { hp: 0.5, fire: 0.5, drop: 2.0, accel: 1.0 };
       case Difficulty.HARD: return { hp: 1.6, fire: 1.4, drop: 0.8, accel: 1.6 }; 
-      default: return { hp: 1.0, fire: 1.0, drop: 1.0, accel: 1.3 }; // MID Difficulty now accelerates 1.3x faster
+      default: return { hp: 1.0, fire: 1.0, drop: 1.0, accel: 1.3 };
     }
   }
 
   private spawnLogic() {
     if (this.bossActive) return;
-    
     const diff = this.getDifficultyModifier();
-    
-    // Boss Spawn Threshold now scales with difficulty acceleration
     if (this.score >= this.bossSpawnThreshold && (this.score - this.lastBossScore) > (this.bossCooldown / diff.accel)) {
       this.spawnBoss();
-      // Increase next threshold faster based on difficulty acceleration
       this.bossSpawnThreshold += (15000 / diff.accel);
       return;
     }
-
     this.spawnTimer += this.dt;
-    
-    // Progression factor now accounts for the 1.3x acceleration in Mid/Hard
     const progressionFactor = Math.floor((this.score * diff.accel) / 3500);
     const scaledRate = Math.max(400, (2000 - (progressionFactor * 130)) / diff.fire);
-    
     if (this.spawnTimer > scaledRate) {
       this.spawnTimer = 0;
       const roll = Math.random();
       let type: 'drone' | 'skimmer' | 'guardian' = 'drone';
-      
       const scoreCheck = this.score * diff.accel;
       if (scoreCheck > 18000 && roll > 0.85) type = 'guardian';
       else if (scoreCheck > 7000 && roll > 0.75) type = 'skimmer';
-
       const hpScale = (1 + (scoreCheck / 40000)) * diff.hp;
-      
       this.enemies.push({
         id: Math.random().toString(36).substr(2, 5),
         x: Math.random() * (CANVAS_VIRTUAL_WIDTH - 100) + 50,
@@ -288,7 +293,6 @@ export class GameEngine {
           if (hpPercent < 0.2) e.phase = 4;
           else if (hpPercent < 0.5) e.phase = 3;
           else if (hpPercent < 0.8) e.phase = 2;
-
           if (now - e.lastShot > e.fireRate) {
             e.lastShot = now;
             if (e.phase === 1) {
@@ -333,12 +337,10 @@ export class GameEngine {
             b.active = false;
             e.health -= b.damage;
             this.spawnExplosion(b.x, b.y, 1, COLORS.WHITE);
-            
             const hitDropThreshold = 0.992 / diff.drop; 
             if (e.type === 'boss' && Math.random() > hitDropThreshold) {
               this.spawnPowerUp(e.x + (Math.random()-0.5)*150, e.y + 80);
             }
-
             if (e.health <= 0) {
               e.active = false;
               this.score += e.scoreValue;
@@ -464,18 +466,13 @@ export class GameEngine {
     const scale = this.canvas.width / CANVAS_VIRTUAL_WIDTH;
     ctx.save();
     ctx.scale(scale, scale);
-    
     if (this.shakeTime > 0 && this.settings.screenShake) {
       ctx.translate((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15);
     }
-    
-    // Background - Only Stars
     ctx.fillStyle = COLORS.WHITE;
     for (const s of this.stars) ctx.fillRect(s.x, s.y, s.s, s.s);
-    
     for (const p of this.powerUps) this.drawPowerUp(ctx, p);
     for (const e of this.enemies) this.drawEnemy(ctx, e);
-    
     for (const b of this.bullets) {
       ctx.fillStyle = b.owner === 'player' ? COLORS.WHITE : COLORS.NEON_GREEN;
       if (b.owner === 'player') ctx.fillRect(b.x - b.width/2, b.y - b.height/2, b.width, b.height);
@@ -562,18 +559,15 @@ export class GameEngine {
     ctx.strokeStyle = COLORS.NEON_GREEN;
     ctx.fillStyle = COLORS.BLACK;
     ctx.lineWidth = 2.5;
-
     if (e.type === 'boss') {
       const angle = performance.now() * 0.001;
       const scale = 1 + Math.sin(performance.now() * 0.002) * 0.08;
       ctx.scale(scale, scale);
-      
       ctx.rotate(angle);
       for(let i=0; i<3; i++) {
         ctx.rotate(Math.PI/1.5);
         ctx.strokeRect(-80, -80, 160, 160);
       }
-      
       ctx.rotate(-angle * 1.5);
       if (this.sigilImg.complete) {
         ctx.drawImage(this.sigilImg, -60, -60, 120, 120);
@@ -581,7 +575,6 @@ export class GameEngine {
       ctx.beginPath();
       ctx.arc(0, 0, 65, 0, Math.PI * 2);
       ctx.stroke();
-
     } else if (e.type === 'guardian') {
       const r = performance.now() * 0.002;
       ctx.rotate(r);

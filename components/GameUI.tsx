@@ -7,7 +7,7 @@ interface GameUIProps {
   hud: { score: number; bestScore: number; lives: number; shield: number };
   settings: Settings;
   onAction: (action: string) => void;
-  onJoystickMove: (x: number, y: number) => void;
+  onJoystickMove: (x: number, y: number, isTarget?: boolean) => void;
   onJoystickEnd: () => void;
   onShootToggle: (active: boolean) => void;
 }
@@ -22,22 +22,19 @@ const GameUI: React.FC<GameUIProps> = ({
   onJoystickEnd
 }) => {
   const handleJoystickTouch = (e: React.TouchEvent) => {
+    if (gameState !== GameState.PLAYING) return;
     const touch = e.touches[0];
     const rect = e.currentTarget.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const dx = touch.clientX - centerX;
-    const dy = touch.clientY - centerY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const maxDist = rect.width / 4; 
     
-    const nx = dx / maxDist;
-    const ny = dy / maxDist;
+    // Calculate percentage position within the active game area
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
     
-    const finalX = dist > maxDist ? nx * (maxDist / dist) : nx;
-    const finalY = dist > maxDist ? ny * (maxDist / dist) : ny;
+    const pctX = touchX / rect.width;
+    const pctY = touchY / rect.height;
     
-    onJoystickMove(finalX, finalY);
+    // Pass as target coordinates (normalized 0-1)
+    onJoystickMove(pctX, pctY, true);
   };
 
   return (
@@ -67,7 +64,7 @@ const GameUI: React.FC<GameUIProps> = ({
         </div>
       </div>
 
-      {/* Pause Button - Ensure it has a higher z-index than the touch layer */}
+      {/* Pause Button */}
       <div className="absolute top-6 left-6 pointer-events-auto z-10">
         <button 
           onClick={(e) => {
@@ -80,7 +77,7 @@ const GameUI: React.FC<GameUIProps> = ({
         </button>
       </div>
 
-      {/* Touch Input Layer - Invisible Full Screen Control */}
+      {/* Touch Input Layer - Full Screen Control */}
       {gameState === GameState.PLAYING && (
         <div 
           className="absolute inset-0 pointer-events-auto z-0"

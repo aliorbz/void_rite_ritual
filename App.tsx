@@ -85,7 +85,6 @@ const App: React.FC = () => {
   
   const [settings, setSettings] = useState<Settings>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    // Force ControlMode.DRAG for auto-fire and touch-follow behavior
     return saved ? { ...JSON.parse(saved), controlMode: ControlMode.DRAG } : {
       controlMode: ControlMode.DRAG,
       sound: true,
@@ -206,114 +205,95 @@ const App: React.FC = () => {
     }
   };
 
-  if (view === 'landing') {
-    return (
-      <div className="relative h-screen w-full bg-black overflow-hidden flex flex-col items-center justify-between p-8">
-        <SigilBackground />
-
-        {/* Top Right Settings Button */}
-        <button 
-          onClick={() => setView('settings')} 
-          className="absolute top-8 right-8 z-20 w-12 h-12 flex items-center justify-center border border-[#39FF14]/30 rounded-full bg-black/20 hover:bg-[#39FF14]/10 transition-colors"
-        >
-          <span className="text-[#39FF14] text-xl">⚙</span>
-        </button>
-
-        {/* Header/Score Space */}
-        <div className="z-10 mt-12">
-          <p className="text-neutral-600 text-[10px] tracking-widest uppercase font-bold text-center">Best Ritual: {displayBestScore}</p>
-        </div>
-
-        {/* Main Menu */}
-        <div className="z-10 text-center">
-          <h1 className="text-6xl md:text-8xl font-occult font-black text-white mb-2 drop-shadow-[0_0_25px_rgba(57,255,20,0.6)] tracking-tighter">VOID RITE</h1>
-          <p className="text-[#39FF14] tracking-[0.4em] uppercase text-xs mb-16 font-black">Sacrifice the Core</p>
-          <div className="max-w-xs mx-auto">
-            <button onClick={() => setView('play')} className="w-full py-6 bg-[#39FF14] text-black font-black text-2xl hover:scale-105 active:scale-95 transition-all font-occult shadow-[0_0_20px_rgba(57,255,20,0.4)]">BEGIN RITE</button>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="z-10 mb-6 flex flex-col items-center gap-4">
-          <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-6 py-3 border border-[#39FF14]/20 rounded-full group transition-all hover:border-[#39FF14]/50 hover:shadow-[0_0_15px_rgba(57,255,20,0.15)]">
-            <img 
-              src={PROFILE_IMG} 
-              className="w-8 h-8 rounded-full border border-[#39FF14]/30 grayscale group-hover:grayscale-0 transition-all" 
-              alt="ali" 
-            />
-            <span className="text-neutral-500 text-[10px] tracking-[0.2em] font-bold uppercase">
-              EVOKED FROM THE VOID BY{' '}
-              <a 
-                href="https://x.com/aliorbz" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="pointer-events-auto text-[#39FF14] hover:brightness-125 hover:drop-shadow-[0_0_8px_#39FF14] transition-all relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[1px] after:bg-[#39FF14] hover:after:w-full after:transition-all"
-              >
-                aliorbz
-              </a>
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (view === 'settings') {
-    return (
-      <div className="h-screen w-full bg-black p-8 flex flex-col text-white">
-        <h1 className="font-occult text-4xl mb-12 text-[#39FF14] text-center tracking-widest">MODS & RITES</h1>
-        <div className="flex-1 space-y-12 overflow-y-auto max-w-md mx-auto w-full px-4 scrollbar-hide">
-          <section>
-            <h3 className="text-[#39FF14] text-xs font-black tracking-[0.3em] mb-6 border-l-2 border-[#39FF14] pl-3">DIFFICULTY MODS</h3>
-            <div className="grid grid-cols-3 gap-3">
-              {[Difficulty.EASY, Difficulty.MID, Difficulty.HARD].map(d => (
-                <button 
-                  key={d}
-                  onClick={() => setSettings(s => ({...s, difficulty: d}))}
-                  className={`py-4 text-[11px] font-black tracking-widest border-2 transition-all ${settings.difficulty === d ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5' : 'border-neutral-900 text-neutral-600'}`}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 p-3 bg-neutral-950 border border-neutral-900">
-               <p className="text-[10px] text-neutral-400 uppercase tracking-tighter leading-relaxed">
-                {settings.difficulty === Difficulty.EASY && "Vessels shatter easily. The Grimoire is generous."}
-                {settings.difficulty === Difficulty.MID && "A balanced path through the drifting void. 1.3x Intensity."}
-                {settings.difficulty === Difficulty.HARD && "The Archons demand perfection. Maximum ritual intensity."}
-              </p>
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-[#39FF14] text-xs font-black tracking-[0.3em] mb-6 border-l-2 border-[#39FF14] pl-3">VISUAL ARTIFACTS</h3>
-            <div className="flex items-center justify-between py-4">
-              <span className="text-xs font-black tracking-[0.2em] uppercase">SCREEN SHAKE</span>
-              <button onClick={() => setSettings(s => ({...s, screenShake: !s.screenShake}))} className={`w-14 h-7 rounded-full relative transition-all duration-300 ${settings.screenShake ? 'bg-[#39FF14]' : 'bg-neutral-800'}`}>
-                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${settings.screenShake ? 'left-8' : 'left-1'}`} />
-              </button>
-            </div>
-          </section>
-        </div>
-        <button onClick={() => setView('landing')} className="mt-12 max-w-md mx-auto w-full py-6 bg-white text-black font-black font-occult text-xl active:scale-95 transition-all shadow-xl tracking-widest">SAVE RITE</button>
-      </div>
-    );
-  }
-
   return (
     <div className="relative h-screen w-full bg-[#050505] touch-none overflow-hidden flex items-center justify-center">
-      <div className="relative bg-black overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)]" style={{ width: 'min(100vw, calc(100vh * 0.5625))', height: 'min(100vh, calc(100vw * 1.777))' }}>
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
-        <GameUI 
-          gameState={gameState} 
-          hud={{ ...hudData, bestScore: displayBestScore }} 
-          settings={settings}
-          onAction={handleAction}
-          onJoystickMove={(x, y) => { if (engineRef.current) engineRef.current.joystick = { active: true, x, y }; }}
-          onJoystickEnd={() => { if (engineRef.current) { engineRef.current.joystick.active = false; engineRef.current.joystick.x = 0; engineRef.current.joystick.y = 0; } }}
-          onShootToggle={(active) => { if (engineRef.current) engineRef.current.shooting = active; }}
-        />
-      </div>
+      {view === 'landing' ? (
+        <div className="relative h-screen w-full bg-black overflow-hidden flex flex-col items-center justify-between p-8">
+          <SigilBackground />
+          <button 
+            onClick={() => setView('settings')} 
+            className="absolute top-8 right-8 z-20 w-12 h-12 flex items-center justify-center border border-[#39FF14]/30 rounded-full bg-black/20 hover:bg-[#39FF14]/10 transition-colors pointer-events-auto"
+          >
+            <span className="text-[#39FF14] text-xl font-bold">⚙</span>
+          </button>
+
+          <div className="z-10 mt-12">
+            <p className="text-neutral-600 text-[10px] tracking-widest uppercase font-bold text-center">Best Ritual: {displayBestScore}</p>
+          </div>
+
+          <div className="z-10 text-center">
+            <h1 className="text-6xl md:text-8xl font-occult font-black text-white mb-2 drop-shadow-[0_0_25px_rgba(57,255,20,0.6)] tracking-tighter">VOID RITE</h1>
+            <p className="text-[#39FF14] tracking-[0.4em] uppercase text-xs mb-16 font-black">Sacrifice the Core</p>
+            <div className="max-w-xs mx-auto">
+              <button onClick={() => setView('play')} className="w-full py-6 bg-[#39FF14] text-black font-black text-2xl hover:scale-105 active:scale-95 transition-all font-occult shadow-[0_0_20px_rgba(57,255,20,0.4)] pointer-events-auto">BEGIN RITE</button>
+            </div>
+          </div>
+
+          <div className="z-10 mb-6 flex flex-col items-center gap-4">
+            <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-6 py-3 border border-[#39FF14]/20 rounded-full group transition-all hover:border-[#39FF14]/50 hover:shadow-[0_0_15px_rgba(57,255,20,0.15)]">
+              <img src={PROFILE_IMG} className="w-8 h-8 rounded-full border border-[#39FF14]/30 grayscale group-hover:grayscale-0 transition-all" alt="ali" />
+              <span className="text-neutral-500 text-[10px] tracking-[0.2em] font-bold uppercase">EVOKED FROM THE VOID BY{' '}
+                <a href="https://x.com/aliorbz" target="_blank" rel="noopener noreferrer" className="pointer-events-auto text-[#39FF14] hover:brightness-125 transition-all">aliorbz</a>
+              </span>
+            </div>
+          </div>
+        </div>
+      ) : view === 'settings' ? (
+        <div className="h-screen w-full bg-black p-8 flex flex-col text-white">
+          <h1 className="font-occult text-4xl mb-12 text-[#39FF14] text-center tracking-widest">MODS & RITES</h1>
+          <div className="flex-1 space-y-12 overflow-y-auto max-w-md mx-auto w-full px-4 scrollbar-hide">
+            <section>
+              <h3 className="text-[#39FF14] text-xs font-black tracking-[0.3em] mb-6 border-l-2 border-[#39FF14] pl-3">DIFFICULTY MODS</h3>
+              <div className="grid grid-cols-3 gap-3">
+                {[Difficulty.EASY, Difficulty.MID, Difficulty.HARD].map(d => (
+                  <button 
+                    key={d}
+                    onClick={() => setSettings(s => ({...s, difficulty: d}))}
+                    className={`py-4 text-[11px] font-black tracking-widest border-2 transition-all ${settings.difficulty === d ? 'border-[#39FF14] text-[#39FF14] bg-[#39FF14]/5' : 'border-neutral-900 text-neutral-600'}`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </section>
+            <section>
+              <h3 className="text-[#39FF14] text-xs font-black tracking-[0.3em] mb-6 border-l-2 border-[#39FF14] pl-3">VISUAL ARTIFACTS</h3>
+              <div className="flex items-center justify-between py-4">
+                <span className="text-xs font-black tracking-[0.2em] uppercase">SCREEN SHAKE</span>
+                <button onClick={() => setSettings(s => ({...s, screenShake: !s.screenShake}))} className={`w-14 h-7 rounded-full relative transition-all duration-300 ${settings.screenShake ? 'bg-[#39FF14]' : 'bg-neutral-800'}`}>
+                  <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${settings.screenShake ? 'left-8' : 'left-1'}`} />
+                </button>
+              </div>
+            </section>
+          </div>
+          <button onClick={() => setView('landing')} className="mt-12 max-w-md mx-auto w-full py-6 bg-white text-black font-black font-occult text-xl active:scale-95 transition-all shadow-xl tracking-widest">SAVE RITE</button>
+        </div>
+      ) : (
+        <div className="relative bg-black overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)]" style={{ width: 'min(100vw, calc(100vh * 0.5625))', height: 'min(100vh, calc(100vw * 1.777))' }}>
+          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+          <GameUI 
+            gameState={gameState} 
+            hud={{ ...hudData, bestScore: displayBestScore }} 
+            settings={settings}
+            onAction={handleAction}
+            onJoystickMove={(x, y, isTarget = false) => { 
+              if (engineRef.current) {
+                if (isTarget) {
+                  // Direct touch targeting: Convert from screen space (isTarget means x,y are screen coordinates relative to canvas)
+                  // x,y are in % here from handleJoystickTouch update
+                  engineRef.current.joystick.active = true;
+                  engineRef.current.joystick.targetX = x * CANVAS_VIRTUAL_WIDTH;
+                  engineRef.current.joystick.targetY = y * CANVAS_VIRTUAL_HEIGHT;
+                } else {
+                  engineRef.current.joystick = { active: true, x, y, targetX: 0, targetY: 0 };
+                }
+              }
+            }}
+            onJoystickEnd={() => { if (engineRef.current) { engineRef.current.joystick.active = false; engineRef.current.joystick.x = 0; engineRef.current.joystick.y = 0; } }}
+            onShootToggle={(active) => { if (engineRef.current) engineRef.current.shooting = active; }}
+          />
+        </div>
+      )}
     </div>
   );
 };
