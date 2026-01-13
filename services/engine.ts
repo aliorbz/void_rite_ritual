@@ -67,6 +67,10 @@ export class GameEngine {
   private bossSpawnThreshold = 5000;
   private bossPhaseTimer = 0;
 
+  // Logic for rare aimed shots
+  private aimedShotCooldown = 25000 + Math.random() * 5000; // 25-30 seconds
+  private aimedShotTimer = 0;
+
   public joystick = { active: false, x: 0, y: 0, targetX: 0, targetY: 0 };
   public keyboard = { up: false, down: false, left: false, right: false, space: false };
   public shooting = false;
@@ -114,8 +118,13 @@ export class GameEngine {
     this.updateBackground();
     this.handleCollisions();
     this.spawnLogic();
+    
     if (this.shakeTime > 0) this.shakeTime -= this.dt;
     if (this.player.invuln > 0) this.player.invuln -= this.dt;
+    
+    // Global timer for aimed shots
+    this.aimedShotTimer += this.dt;
+    
     this.score += 1;
   }
 
@@ -160,7 +169,6 @@ export class GameEngine {
   private updateBullets() {
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
-      // Note: Continuous homing logic removed to allow dodging
       b.x += b.vx;
       b.y += b.vy;
       if (b.y < -100 || b.y > CANVAS_VIRTUAL_HEIGHT + 100 || b.x < -100 || b.x > CANVAS_VIRTUAL_WIDTH + 100) {
@@ -198,13 +206,12 @@ export class GameEngine {
     let finalVx = vx;
     let finalVy = vy;
 
-    // If 'homing' is true here, it means 'Aimed at Player'. 
-    // We calculate the direction once so the player can dodge.
+    // Snapshot Aiming (Aimed at player's current position)
     if (homing && owner === 'enemy') {
       const dx = this.player.x - x;
       const dy = this.player.y - y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const speed = Math.sqrt(vx * vx + vy * vy) || 7; // Default speed if none provided
+      const speed = Math.sqrt(vx * vx + vy * vy) || 7.5; 
       finalVx = (dx / dist) * speed;
       finalVy = (dy / dist) * speed;
     }
@@ -212,14 +219,14 @@ export class GameEngine {
     this.bullets.push({
       id: Math.random().toString(36).substr(2, 5),
       x, y, vx: finalVx, vy: finalVy,
-      width: owner === 'player' ? 6 : (homing ? 16 : 12),
-      height: owner === 'player' ? 22 : (homing ? 16 : 12),
+      width: owner === 'player' ? 6 : (homing ? 18 : 12),
+      height: owner === 'player' ? 22 : (homing ? 18 : 12),
       active: true,
       owner,
       damage,
       health: 1,
       maxHealth: 1,
-      homing // Still use this flag for visual rendering (Red color)
+      homing // Flag for red visual effect
     });
   }
 
@@ -312,11 +319,10 @@ export class GameEngine {
 
           if (now - e.lastShot > e.fireRate) {
             e.lastShot = now;
+            // Boss shots are standard patterns, NO aiming (removed per user request)
             if (e.phase === 1) {
               for (let j = -3; j <= 3; j++) {
-                // Occasional aimed shot in Phase 1
-                const isAimed = Math.abs(j) === 0;
-                this.spawnBullet(e.x, e.y + 80, j * 2.5, 6, 'enemy', 1, isAimed);
+                this.spawnBullet(e.x, e.y + 80, j * 2.5, 6.5, 'enemy', 1, false);
               }
               e.fireRate = 1000 * (1/diff.fire);
             } else if (e.phase === 2) {
@@ -330,11 +336,10 @@ export class GameEngine {
                this.spawnBullet(e.x, e.y + 80, sweep, 9.5, 'enemy', 1);
                e.fireRate = 200 * (1/diff.fire);
             } else {
-               for (let j = 0; j < 8; j++) {
-                 const isAimed = j === 0;
-                 this.spawnBullet(e.x, e.y, (Math.random() - 0.5) * 22, 5 + Math.random() * 10, 'enemy', 1, isAimed);
+               for (let j = -4; j <= 4; j++) {
+                 this.spawnBullet(e.x, e.y + 80, j * 3, 7, 'enemy', 1, false);
                }
-               e.fireRate = 350 * (1/diff.fire);
+               e.fireRate = 450 * (1/diff.fire);
             }
           }
         }
@@ -342,9 +347,15 @@ export class GameEngine {
         e.x += e.vx;
         e.y += e.vy;
         if (now - e.lastShot > e.fireRate) {
-           // Guardian type fires an aimed shot at player's position
-           const isAimed = e.type === 'guardian';
-           this.spawnBullet(e.x, e.y + 20, 0, 7.5, 'enemy', 1, isAimed);
+           // Standard enemies: Only fire aimed shot if the global timer allowed it
+           let triggerAimed = false;
+           if (this.aimedShotTimer >= this.aimedShotCooldown) {
+             triggerAimed = true;
+             this.aimedShotTimer = 0;
+             this.aimedShotCooldown = 25000 + Math.random() * 5000;
+           }
+           
+           this.spawnBullet(e.x, e.y + 20, 0, 7.0, 'enemy', 1, triggerAimed);
            e.lastShot = now;
         }
       }
@@ -513,7 +524,7 @@ export class GameEngine {
         if (b.homing) { // Visual 'Homing' flag used for Red/Aimed bullets
           const pulse = Math.sin(performance.now() * 0.01) * 2;
           ctx.fillStyle = '#FF3131'; 
-          ctx.shadowBlur = 10;
+          ctx.shadowBlur = 15;
           ctx.shadowColor = '#FF3131';
           ctx.beginPath();
           ctx.arc(b.x, b.y, (b.width/2) + pulse, 0, Math.PI * 2);
@@ -683,6 +694,7 @@ export class GameEngine {
     this.lastBossScore = 0;
     this.bossSpawnThreshold = 5000;
     this.bossPhaseTimer = 0;
+    this.aimedShotTimer = 0;
     this.gameState = GameState.PLAYING;
     this.lastTime = performance.now();
   }
